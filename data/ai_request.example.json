@@ -1,0 +1,115 @@
+{
+  "task_id": 1001,
+  "show_id": 2001,
+  "org_id": 1,
+  "industry_id": 2,
+  "task": {
+    "task_desc": "车展视频生成",
+    "task_type": 4,//1 普通成片  2 普通成片得 重新生成  3 爆款裂变   4 爆款裂变得重新生成
+    "video_type": 1, //1 口播从开场白视频开始  2 口播在开场白视频结束后开始，视频时长限制要稍微尝一下
+    "ai_director": "我要生成北京车展",
+    "template_strategy": 1, //1使用已选中优先 2 智能匹配
+    "retry_type": 1,
+    "video_count": 10,
+    "city_name": "北京",
+    "show_title": "家博会车展",
+    "show_address": "北京国际展览中心",
+    "show_time": "2026-05-01到2026-05-03",
+    "show_desc": "北京车展",
+    "mult_source": [ //爆款裂变
+      {
+        "source_video_id": 1,
+        "type": 1,
+        "videos": [
+          {
+            "material_id": 1,
+            "material_path": "D:/php/ai-video/static/uploads/1111.mp4",
+            "is_opening": 1
+          }
+        ],
+        "templates": {
+          "material_id": 2,
+          "material_path": "D:/php/ai-video/static/uploads/1111.mp4"
+        },
+        "bgms": [
+          {
+            "material_id": 3,
+            "material_path": "D:/php/ai-video/static/uploads/bgm.mp3"
+          }
+        ],
+        "voices": {
+          "material_id": 4,
+          "robot_show_name": "小美"
+        },
+        "scripts": {
+          "material_id": 5,
+          "script_content": "欢迎来到北京车展"
+        }
+      }
+    ],
+    "retry_source": [
+      {
+        "source_video_id": 2,
+        "type": 2,
+        "videos": [
+          {
+            "material_id": 6,
+            "material_path": "D:/php/ai-video/static/uploads/2222.mp4",
+            "is_opening": 1
+          }
+        ],
+        "templates": {
+          "material_id": 7,
+          "material_path": "D:/php/ai-video/static/uploads/template_2.png"
+        },
+        "bgms": [
+          {
+            "material_id": 8,
+            "material_path": "D:/php/ai-video/static/uploads/bgm_2.mp3"
+          }
+        ],
+        "voices": {
+          "material_id": 9,
+          "robot_show_name": "小美"
+        },
+        "scripts": {
+          "material_id": 10,
+          "script_content": "欢迎来到北京车展"
+        }
+      }
+    ]
+  },
+  "result": {
+    "videos": [
+      {
+        "material_id": 4,
+        "material_path": "D:/php/ai-video/static/uploads/1111.mp4",
+        "is_opening": 1
+      }
+    ],
+    "templates": [
+      {
+        "material_id": 2,
+        "material_path": "D:/php/ai-video/static/uploads/1111.mp4"
+      }
+    ],
+    "bgms": [ //为空  = 真空
+      {
+        "material_id": 4,
+        "material_path": "D:/php/ai-video/static/uploads/bgm.mp3"
+      }
+    ],
+    "voices": [
+      {
+        "material_id": 4,
+        "robot_show_name": "小美"
+      }
+    ],
+    "scripts": [//为空  = 真空
+      {
+        "material_id": 5,
+        "script_content": "欢迎来到北京车展"
+      }
+    ]
+  }
+}

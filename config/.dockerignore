@@ -1,0 +1,26 @@
+# .dockerignore
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+env/
+venv/
+.venv/
+pip-log.txt
+pip-delete-this-directory.txt
+.git
+.gitignore
+README.md
+.dockerignore
+Dockerfile
+docker-compose*.yml
+*.log
+logs/
+data/
+models/
+
+# Only include the specific build asset we need
+!build-assets/uv-install.sh
+build-assets/*
+!build-assets/uv-install.sh

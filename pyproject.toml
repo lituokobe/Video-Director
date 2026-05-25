@@ -1,0 +1,13 @@
+[project]
+name = "video-director"
+version = "0.1.0"
+description = "Take user requests and return recommended plans of video elements"
+requires-python = ">=3.11"
+dependencies = [
+    "dotenv>=0.9.9",
+    "fastapi>=0.136.1",
+    "langchain>=1.2.17",
+    "langchain-openai>=1.2.1",
+    "pymilvus>=3.0.0",
+    "uvicorn>=0.46.0",
+]

@@ -1,0 +1,34 @@
+{
+  "task_id": 1001,
+  "show_id": 2001,
+  "org_id": 1,
+  "industry_id": 2,
+  "results": [
+    {
+      "video_ids": [
+        {
+          "material_id": 1,
+          "material_path": "D:/php/ai-video/static/uploads/1111.mp4"
+        }
+      ],
+      "template_id": {
+        "material_id": 2,
+        "material_path": "D:/php/ai-video/static/uploads/template.json"
+      },
+      "bgm_ids": [
+        {
+          "material_id": 3,
+          "material_path": "D:/php/ai-video/static/uploads/bgm.mp3"
+        }
+      ],
+      "voice_ids": {
+        "material_id": 4
+      },
+      "scripts": {
+        "material_id": 5,
+        "script_content": "欢迎来到北京车展"
+      },
+      "retry_video": 2
+    }
+  ]
+}

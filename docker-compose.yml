@@ -1,0 +1,38 @@
+services:
+  video-director:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: video-director:latest
+    container_name: video-director
+    ports:
+      - "8014:8014"
+    volumes:
+      # Mount application code and config as read-only (edit on host, no rebuild needed)
+      - ./config:/app/config:ro
+      - ./data:/app/data:ro
+      - ./functionals:/app/functionals:ro
+      - ./models:/app/models:ro
+      - ./video_director.py:/app/video_director.py:ro
+      - ./logs:/app/logs:rw
+    environment:
+      PYTHONPATH: /app # Optional, directory to look for modules
+      HOST_DOCKER_INTERNAL: host.docker.internal
+    env_file:
+      - ./.env
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8014/health"]
+      interval: 300s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    command: > 
+      uvicorn video_director:app 
+      --host 0.0.0.0 
+      --port 8014
+      --log-level info
+    # Explicitly run as non-root user (matches Dockerfile UID 1008)
+    user: "1008:1008"
+    restart: unless-stopped

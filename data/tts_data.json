@@ -1,0 +1,301 @@
+[{
+	"material_id": 138,
+	"material_desc": "语调平稳、咬字柔和、自带治愈安抚力的女声音色"
+}, {
+	"material_id": 139,
+	"material_desc": "声线甜美有活力的妹妹，活泼开朗，笑容明媚。"
+}, {
+	"material_id": 140,
+	"material_desc": "声线阳光温暖、语气亲切，活力满满的少年音"
+}, {
+	"material_id": 141,
+	"material_desc": "语速明快、中气十足，充满激情与感染力的解说男声"
+}, {
+	"material_id": 142,
+	"material_desc": "语调舒缓、咬字温润，自带母性柔光的治愈女声"
+}, {
+	"material_id": 143,
+	"material_desc": "语调灵动跳脱、元气满满，古灵精怪的少女音"
+}, {
+	"material_id": 144,
+	"material_desc": "语调活泼、声线亲切，适配儿童故事的治愈女声"
+}, {
+	"material_id": 145,
+	"material_desc": "语调明快、感染力拉满，专业感十足的解说音"
+}, {
+	"material_id": 146,
+	"material_desc": "声线干练、气场强大，飒爽独立的大女主音"
+}, {
+	"material_id": 147,
+	"material_desc": "声线威严、气场拉满，自带帝王霸气的御姐音"
+}, {
+	"material_id": 148,
+	"material_desc": "声线清亮稚嫩、天赋感拉满，灵动清澈的童声"
+}, {
+	"material_id": 149,
+	"material_desc": "语调轻柔、咬字温婉，气质娴静的淑女音"
+}, {
+	"material_id": 150,
+	"material_desc": "声线雄浑、气场强大，正气凛然的成熟男声"
+}, {
+	"material_id": 151,
+	"material_desc": "语调软糯、语气娇柔，像女友般贴心的治愈女声"
+}, {
+	"material_id": 152,
+	"material_desc": "语调温柔、声线干净，气质谦和的青年男声"
+}, {
+	"material_id": 153,
+	"material_desc": "语调温暖、语气治愈，充满正能量的女声"
+}, {
+	"material_id": 154,
+	"material_desc": "声线甜美软糯、语气娇俏，元气满满的甜妹音"
+}, {
+	"material_id": 155,
+	"material_desc": "声线清澈干净、语调温柔，气质纯净的少年音"
+}, {
+	"material_id": 156,
+	"material_desc": "声线阳光、语气开朗，充满活力的青年男声"
+}, {
+	"material_id": 157,
+	"material_desc": "声线沉稳、语调平缓，阅历感十足的叔音"
+}, {
+	"material_id": 158,
+	"material_desc": "声线干净清爽、语气阳光，元气满满的大学生音"
+}, {
+	"material_id": 159,
+	"material_desc": "语调沉稳、咬字清晰，气质知性的成熟女声"
+}, {
+	"material_id": 160,
+	"material_desc": "语调轻柔、声线软萌，安静乖巧的萝莉音"
+}, {
+	"material_id": 161,
+	"material_desc": "语调温润、声线清雅，书卷气十足的君子音"
+}, {
+	"material_id": 162,
+	"material_desc": "声线阳光、语气爽朗，阳光开朗的学长音"
+}, {
+	"material_id": 163,
+	"material_desc": "语调明快、声线阳光，元气满满的青年男声"
+}, {
+	"material_id": 164,
+	"material_desc": "语调温柔、语气亲切，像家人般暖心的治愈女声"
+}, {
+	"material_id": 165,
+	"material_desc": "高冷御姐，外表疏离难亲近，内心却细腻柔软"
+}, {
+	"material_id": 166,
+	"material_desc": "声线爽朗、语气直白，性格飒爽不扭捏的直球女声"
+}, {
+	"material_id": 167,
+	"material_desc": "声线雄浑、气场拉满，充满力量感的御姐音"
+}, {
+	"material_id": 168,
+	"material_desc": "语调软糯、语气讨好，自带逢迎感的女声"
+}, {
+	"material_id": 169,
+	"material_desc": "声线沙哑慵懒、自带电音，风格独特的御姐音"
+}, {
+	"material_id": 170,
+	"material_desc": "声线憨厚、语气诙谐，自带喜感的男声，完美还原动画角色的憨态"
+}, {
+	"material_id": 171,
+	"material_desc": "声线阳光、语气活泼，元气满满的少年音，像邻家弟弟般亲切治愈"
+}, {
+	"material_id": 172,
+	"material_desc": "语调慵懒、声线空灵，自带仙气的清冷男声"
+}, {
+	"material_id": 173,
+	"material_desc": "语调平缓、声线慈悲，自带禅意的高僧音"
+}, {
+	"material_id": 174,
+	"material_desc": "声线元气、语气活泼，古灵精怪的大姐姐音"
+}, {
+	"material_id": 175,
+	"material_desc": "语调温柔、语气亲切，像邻家姐姐般暖心的治愈女声"
+}, {
+	"material_id": 176,
+	"material_desc": "声线清冷干净、语调沉稳，气质清冷的青年女声"
+}, {
+	"material_id": 177,
+	"material_desc": "语调软糯、语气娇柔，自带氛围感的甜妹音"
+}, {
+	"material_id": 178,
+	"material_desc": "声线灵动跳脱、语气搞怪，完美还原游戏角色的俏皮童音"
+}, {
+	"material_id": 179,
+	"material_desc": "语调舒缓、情感细腻，适配深夜陪伴的多情感男声，氛围感拉满"
+}, {
+	"material_id": 180,
+	"material_desc": "声线软萌稚嫩、语气娇俏，元气满满的萝莉音"
+}, {
+	"material_id": 181,
+	"material_desc": "声线清冷疏离、气场强大，冷静干练的御姐音"
+}, {
+	"material_id": 182,
+	"material_desc": "语调明快、声线爽朗，阳光开朗的大姐姐音"
+}, {
+	"material_id": 183,
+	"material_desc": "声线清亮稚嫩、元气满满，活泼开朗的童声"
+}, {
+	"material_id": 184,
+	"material_desc": "声线磁性浑厚、语调沉稳，专业感拉满的解说男声"
+}, {
+	"material_id": 185,
+	"material_desc": "语调温暖、语气治愈，充满正能量的甜妹音"
+}, {
+	"material_id": 186,
+	"material_desc": "语调温柔、语气亲切，像闺蜜般贴心的治愈女声"
+}, {
+	"material_id": 187,
+	"material_desc": "语调低沉、语气神秘，自带悬疑氛围感的男声"
+}, {
+	"material_id": 188,
+	"material_desc": "声线浑厚成熟、气场强大，阅历感十足的叔音"
+}, {
+	"material_id": 189,
+	"material_desc": "语速明快、声线阳光，元气满满的青年男声"
+}, {
+	"material_id": 190,
+	"material_desc": "语调婉转、声线清冷，自带古典韵味的声音"
+}, {
+	"material_id": 191,
+	"material_desc": "语调轻柔、咬字温婉，气质娴静的淑女音，自带大家闺秀的温婉感"
+}, {
+	"material_id": 192,
+	"material_desc": "语气松弛随性、语调慵懒，佛系通透的青年音"
+}, {
+	"material_id": 193,
+	"material_desc": "语调慵懒软糯、声线软绵，自带慵懒感的儿童音"
+}, {
+	"material_id": 194,
+	"material_desc": "声线低沉磁性、语气强势，自带压迫感的霸总男声"
+}, {
+	"material_id": 195,
+	"material_desc": "语调舒缓、声线慈祥，自带岁月感的长辈女声"
+}, {
+	"material_id": 196,
+	"material_desc": "声线软萌稚嫩、奶气十足，软糯可爱的幼童音"
+}, {
+	"material_id": 197,
+	"material_desc": "声线稚嫩灵动、语气娇俏，古灵精怪的萝莉音，完美还原动画角色的元气感"
+}, {
+	"material_id": 198,
+	"material_desc": "声线憨厚软糯、语气呆萌，自带东北口音的可爱男声"
+}, {
+	"material_id": 199,
+	"material_desc": "声线雄浑厚重、气势磅礴，充满力量感的霸气男声"
+}, {
+	"material_id": 200,
+	"material_desc": "语调温润、咬字文雅，书卷气十足的知性男声"
+}, {
+	"material_id": 201,
+	"material_desc": "声线低沉威严、气场拉满，自带帝王霸气的成熟男声"
+}, {
+	"material_id": 202,
+	"material_desc": "声线干净清爽、语气亲切，阳光开朗的少年音"
+}, {
+	"material_id": 203,
+	"material_desc": "声线浑厚、语调沉稳，自带经典译制腔的磁性男声"
+}, {
+	"material_id": 204,
+	"material_desc": "港风韵味十足，咬字利落、语调干练，自带经典港剧旁白质感的御姐音"
+}, {
+	"material_id": 205,
+	"material_desc": "嗲甜软萌的可爱妹妹，灵动娇气，活泼讨喜"
+}, {
+	"material_id": 206,
+	"material_desc": "软糯温柔的邻家女孩，低调内敛，耐心亲和"
+}, {
+	"material_id": 207,
+	"material_desc": "开朗温柔的客服，阳光热情，服务贴心细致"
+}, {
+	"material_id": 208,
+	"material_desc": "少年感十足的清爽男生，温柔亲切，阳光开朗"
+}, {
+	"material_id": 209,
+	"material_desc": "活泼童趣，天真烂漫，可爱治愈"
+}, {
+	"material_id": 210,
+	"material_desc": "逻辑清晰、理性稳重的男性"
+}, {
+	"material_id": 211,
+	"material_desc": "语气温柔舒缓，软糯但有善解人意的治愈系少女音"
+}, {
+	"material_id": 212,
+	"material_desc": "低沉优雅的稳重青年，温柔成熟，儒雅得体"
+}, {
+	"material_id": 213,
+	"material_desc": "温暖爽朗的小妹，阳光热情，性格直爽好相处"
+}, {
+	"material_id": 214,
+	"material_desc": "性感妩媚的御姐，成熟有魅力，风情十足"
+}, {
+	"material_id": 215,
+	"material_desc": "声音治愈的知心姐姐，温柔体贴，擅长倾听与理解"
+}, {
+	"material_id": 216,
+	"material_desc": "声线稳重优雅的知心姐姐，温暖亲和，善于陪伴"
+}, {
+	"material_id": 217,
+	"material_desc": "历经世事的沉稳大叔，果敢可靠，让人安心信赖"
+}, {
+	"material_id": 218,
+	"material_desc": "磁性知性的青年讲师，温柔耐心，专业靠谱"
+}, {
+	"material_id": 219,
+	"material_desc": "傲娇不羁的猴哥，声线经典灵动，一秒梦回西游"
+}, {
+	"material_id": 220,
+	"material_desc": "温暖直爽的邻家小妹，阳光热情，相处轻松自在"
+}, {
+	"material_id": 221,
+	"material_desc": "俏皮元气女生，开朗外向，自带活跃气氛的感染力"
+}, {
+	"material_id": 222,
+	"material_desc": "气质出众的旗袍美人兼职场精英，明媚大方，魅力十足"
+}, {
+	"material_id": 223,
+	"material_desc": "眉目清朗男大，清澈温润有朝气，开朗真诚。"
+}, {
+	"material_id": 224,
+	"material_desc": "声音磁性的男生，成熟理性，做事有条理，让人信赖。"
+}, {
+	"material_id": 225,
+	"material_desc": "磁性温暖的帅气男生，理性沉稳，靠谱有担当"
+}, {
+	"material_id": 226,
+	"material_desc": "声线清冷、语调平缓，冷静克制的成熟男声"
+}, {
+	"material_id": 227,
+	"material_desc": "清甜讲述者，充满童趣与耐心，为孩子编织美好梦境"
+}, {
+	"material_id": 228,
+	"material_desc": "声线明亮甜美的专业客服，亲切耐心，服务细致周到"
+}, {
+	"material_id": 229,
+	"material_desc": "知性活力的女老师，谦虚包容，平易近人"
+}, {
+	"material_id": 230,
+	"material_desc": "高冷御姐，外表疏离难亲近，内心却细腻柔软"
+}, {
+	"material_id": 231,
+	"material_desc": "语气明快利落、咬字清晰带活力、聪明机敏又毒舌的少年音色"
+}, {
+	"material_id": 232,
+	"material_desc": "语气温柔平缓、带有些许软绵感却又善解人意的少女音色"
+}, {
+	"material_id": 233,
+	"material_desc": "温婉治愈的体贴女生，自带亲和力"
+}, {
+	"material_id": 234,
+	"material_desc": "热情阳光的数学教师，气质优雅飒爽"
+}, {
+	"material_id": 235,
+	"material_desc": "可爱的妹妹，性格活泼，举动讨喜。"
+}, {
+	"material_id": 236,
+	"material_desc": "语气洪亮开阔、咬字干脆爽朗、阳光率真不扭捏的少年音色"
+}, {
+	"material_id": 237,
+	"material_desc": "语调灵动跳脱、尾音带娇俏、古灵精怪爱撒娇的少女音色"
+}]
