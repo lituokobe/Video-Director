@@ -23,3 +23,6 @@ TASK_TYPE_CN = {
 }
 
 DEFAULT_QUERY = "适合商业会展"
+
+LOG_KEEPING_HOURS = 24
+LOG_PREFIX = "video_director"

@@ -55,24 +55,33 @@ class DecideTTSResult(BaseModel):
     material_ids: list = Field(default=[])
     material_descs: list = Field(default=[])
 
+
+class SelectedScript(BaseModel):
+    material_id: int
+    script_content: str
+
+class SelectScriptResult(BaseModel):
+    results: list[SelectedScript|None]
+
 class WriteScriptResult(BaseModel):
     scripts: list = Field(default=[])
 
 class TaskRequest(BaseModel):
     task_desc: str = str|None # user's description on task, can be empty
-    task_type: Literal[1,2,3,4] #1 普通成片  2 普通成片得 重新生成  3 爆款裂变   4 爆款裂变得重新生成
-    video_type: Literal[1, 2] # 1 口播从开场白视频开始 2 口播在开场白视频结束后开始，视频时长限制要稍微尝一下
-    ai_director: str|None # user requirements, can be empty
-    template_strategy: Literal[1,2] #1使用已选中优先 2 智能匹配
-    retry_type: Literal[0,1,2]
-    video_count: int #10,
-    city_name: str = Field(min_length=1) # "北京"
-    show_title: str = Field(min_length=1) #"国际汽车文化节"
-    show_address: str = Field(min_length=1) # "北京国际展览中心"
-    show_time: str = Field(min_length=1) # "2026-05-01到2026-05-03"
-    show_desc: str|None # user's description on the show, can be empty
+    task_type: int #1 普通成片  2 普通成片得 重新生成  3 爆款裂变   4 爆款裂变得重新生成
+    ai_director: str | None  # user requirements, can be empty
+    template_strategy: Literal[1, 2]  # 1使用已选中优先 2 智能匹配
+    city_name: str = Field(min_length=1)  # "北京"
+    show_title: str = Field(min_length=1)  # "国际汽车文化节"
+    show_address: str = Field(min_length=1)  # "北京国际展览中心"
+    show_start_date: str = Field(default="")  # "2026-05-01"
+    show_end_date: str = Field(default="") # "2026-05-03"
+    retry_type: Literal[0, 1, 2]
+    show_desc: str | None  # user's description on the show, can be empty
+    video_type: int # 0 没有口播 1 口播从开场白视频开始 2 口播在开场白视频结束后开始，视频时长限制要稍微长一下
     mult_source: list[dict|None]
-    retry_source: list[dict|None]
+    retry_source: list[dict|None] # retry_source_id returned as retry_video
+    video_count: int  # 10,
 
 class RecommendationRequest(BaseModel):
     task_id:int

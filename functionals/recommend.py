@@ -8,7 +8,7 @@ from config.constant_config import TASK_TYPE_CN, MATERIAL_TYPE, TOP_K_RECOMMENDA
     DEFAULT_TOTAL_DURATION, TOP_K_MULT, DEFAULT_QUERY
 from config.path_config import MILVUS_URL, TTS_DATA_PATH
 from config.schema_config import RecommendationRequest, RecommendationResult, TaskRequest, QueryResult, DecideTTSResult, \
-    VideoPlansResponseNoScript, VideoPlansResponseScript
+    VideoPlansResponseNoScript, VideoPlansResponseScript, SelectScriptResult
 from functionals.logger import video_director_logger
 from functionals.utils import user_id_to_collection_name, embed_query
 from models.llm_models import llm_reasoning
@@ -75,6 +75,39 @@ DECIDE_ADDITIONAL_TTS_SYSTEM_PROMPT = """
 }}
 """
 
+SELECT_SCRIPT_SYSTEM_PROMPT = """
+# === 你的角色 ===
+你是资深短视频文案选材师，擅长从各种文案中，筛选选出符合宣传展会短视频的最佳文案。
+
+# === 你的核心任务 === 
+根据展会信息，从备选文案中，严格按照输出要求，筛选出 {video_count} 个最适合制作宣传短视频的文案。
+展会信息：{city_name}{show_title} | {show_desc} | {task_desc} | {ai_director}
+
+# === 备选文案 ===
+{script_candidates}
+
+# === 输出要求 ===
+- **必须输出一个含 `results` 键的 JSON 对象**
+- `results` 的值是包含{video_count}个字典的列表，每个字典代表一个所选的文案。
+- 每个文案字典必须包含且只能包含两个字段：
+    - `material_id`: 1个整数，文案ID
+    - `script_content`: 字符串，仅一字不差的文案内容
+- **不得输出其他格式**，或其他JSON键值，不得输出自然语言对话
+
+# === 输出示例 (仅参考格式) ===
+[
+    {{
+      "material_id": 1,
+      "script_content": "2026北京国际汽车文化节来了，6月12日-15日，就在首钢会展中心，百余款新车齐亮相，车模表演现场抽奖high翻天，快带上你的家人朋友来逛展吧！"
+    }},
+    {{
+      "material_id": 3,
+      "script_content": "2026北京国际汽车文化节将在6月12日-15日登录首钢会展中心，大牌新车云集，车模表演现场抽奖氛围热烈，热爱汽车的你千万不要错过！"
+    }},
+    .........
+]
+"""
+
 class Recommend:
     def __init__(self, request: RecommendationRequest, tts_data:list):
         self.task_id: int = request.task_id
@@ -84,7 +117,7 @@ class Recommend:
         self.task: TaskRequest = request.task
         self.result: dict = request.result
         self.collection_name = user_id_to_collection_name(self.org_id)
-        self.total_duration:int = DEFAULT_TOTAL_DURATION if self.task.video_type == 1 else DEFAULT_TOTAL_DURATION + 3
+        self.total_duration:int = DEFAULT_TOTAL_DURATION if self.task.video_type in [0, 1] else DEFAULT_TOTAL_DURATION + 3
         # O(1) lookup map instead of repeated list scanning
         self.tts_data = tts_data
         self.tts_data_map = {t.get("material_id"): t for t in self.tts_data}
@@ -93,7 +126,18 @@ class Recommend:
         self.additional_query_chain = self._generate_additional_query_chain()
         self.decide_additional_tts_chain = self._generate_decide_additional_tts_chain()
 
+        # select scripts if required video to generate is less than scripts (regular recommend - prioritize selection)
+        self.select_script_chain = self._generate_select_script_chain()
+
         self.milvus_client = AsyncMilvusClient(uri=MILVUS_URL, secure=False)
+
+        # return requirement - there should be a key of retry_video returned
+        self.retry_video = 0
+        retry_source = self.task.retry_source
+        if isinstance(retry_source, list) and retry_source:
+            retry_source1 = retry_source[0]
+            if isinstance(retry_source1, dict) and isinstance(retry_source1.get("source_video_id"), int):
+                self.retry_video = retry_source1["source_video_id"]
 
     @staticmethod
     def _generate_additional_query_chain():
@@ -118,6 +162,12 @@ class Recommend:
         )
         llm_with_structured_output_decide_tts = llm_reasoning.with_structured_output(DecideTTSResult)
         return decide_additional_tts_prompt | llm_with_structured_output_decide_tts
+
+    @staticmethod
+    def _generate_select_script_chain():
+        select_script_prompt = ChatPromptTemplate.from_messages([("system", SELECT_SCRIPT_SYSTEM_PROMPT)])
+        llm_with_structured_output_select_script = llm_reasoning.with_structured_output(SelectScriptResult)
+        return select_script_prompt | llm_with_structured_output_select_script
 
     async def _fetch_desc_from_milvus(self, m_id: int, partition: str) -> dict | None:
         """Safely query Milvus and extract desc_json."""
@@ -518,7 +568,7 @@ class Recommend:
 你是资深短视频导演，擅长从素材库中挑选最佳组合，制作符合展会调性的高质量短视频。
 
 # === 你的核心任务 === 
-制作 {self.total_duration} 秒的展会宣传短视频，共需生成 {self.task.video_count} 个版本。
+制作 {self.total_duration} 秒的展会宣传短视频，尽量生成 {self.task.video_count} 个版本 (如果提供的视频、贴图、音乐等素材不够生成足够多的不同版本，则能生成多少就生成多少)。
 展会信息：{self.task.city_name}{self.task.show_title} | {self.task.show_desc} | {self.task.task_desc} | {self.task.ai_director}
 
 # === 版本构成要求 ===
@@ -546,7 +596,7 @@ class Recommend:
 
 # === 输出要求 ===
 - **必须输出一个含 `plans` 键的 JSON 对象**
-- `plans` 的值是包含{self.task.video_count}个字典的列表，每个字典代表一个版本
+- `plans` 的值是包含{self.task.video_count}个字典的列表，每个字典代表一个版本 (如果提供的视频、贴图、音乐等素材不够生成足够多的不同版本，则能生成多少就生成多少)。
 - 每个版本字典必须包含且只能包含以下字段：
     - `footage_opening`: 1个整数，开场白视频素材的material_id
     - `footage_regular`: 包含整数的数组，1个或多个普通视频素材的material_id
@@ -588,7 +638,7 @@ class Recommend:
 你是资深短视频导演，擅长从素材库中挑选最佳组合，制作符合展会调性的高质量短视频。
 
 # === 你的核心任务 === 
-制作 {self.total_duration} 秒的展会宣传短视频，共需生成 {version_per_script} 个版本。
+制作 {self.total_duration} 秒的展会宣传短视频，尽量生成 {version_per_script} 个版本 (如果提供的视频、贴图、音乐、语音音色等素材不够生成足够多的不同版本，则能生成多少就生成多少)。
 展会信息：{self.task.city_name}{self.task.show_title} | {self.task.show_desc} | {self.task.task_desc} | {self.task.ai_director}
 短视频口播旁白：{script.get("script_content")}
 
@@ -620,7 +670,7 @@ class Recommend:
 
 # === 输出要求 ===
 - **必须输出一个含 `plans` 键的 JSON 对象**
-- `plans` 的值是包含 {version_per_script} 个字典的列表，每个字典代表一个版本
+- `plans` 的值是包含 {version_per_script} 个字典的列表，每个字典代表一个版本 (如果提供的视频、贴图、音乐、语音音色等素材不够生成足够多的不同版本，则能生成多少就生成多少)。
 - 每个版本字典必须包含且只能包含以下字段：
     - `footage_opening`: 1个整数，开场白视频素材的material_id
     - `footage_regular`: 包含整数的数组，1个或多个普通视频素材的material_id
@@ -651,10 +701,9 @@ class Recommend:
 }}
 """
 
-    async def _select_best(self,
-            footage_opening: list, footage_regular: list,
-            image: list, bgm: list, tts: list, scripts:list
-    )->RecommendationResult:
+    async def _select_best(self, footage_opening: list, footage_regular: list,
+                           image: list, bgm: list, tts: list, scripts:list
+                           )->RecommendationResult:
         """
         select the appropriate materials and give the final recommendations
         :param footage_opening: [{"material_id": 1, "material_path": "xx", "material_desc": "xx", "duration": 1.0, "mandatory": False}...]
@@ -665,15 +714,15 @@ class Recommend:
         :param scripts: ["xxx", "xxx", "xxx"]
         :return:
         """
-        print("推荐的最终选择范围: \n"
-              f"  - footage_opening长度: {len(footage_opening)}\n"
-              f"  - footage_regular长度: {len(footage_regular)}\n"
-              f"  - image长度: {len(image)}\n"
-              f"  - bgm长度: {len(bgm)}\n"
-              f"  - tts长度: {len(tts)}\n"
-              f"  - scripts长度: {len(scripts)}\n"
-              )
         if not scripts:
+            video_director_logger.info("推荐的最终选择范围: \n"
+                                       f"  - footage_opening长度: {len(footage_opening)}\n"
+                                       f"  - footage_regular长度: {len(footage_regular)}\n"
+                                       f"  - image长度: {len(image)}\n"
+                                       f"  - bgm长度: {len(bgm)}\n"
+                                       f"  - tts长度: {len(tts)}\n"
+                                       f"  - scripts长度: {len(scripts)}\n"
+                                       )
             select_best_prompt = self._select_best_prompt_no_script(footage_opening, footage_regular, image, bgm)
             print(f"无台词推荐提示词:{select_best_prompt}")
 
@@ -697,6 +746,7 @@ class Recommend:
                 # 3. Map IDs back to full material objects & validate
                 for plan in llm_response.plans:
                     resolved = {
+                        "retry_video" : self.retry_video,
                         "video_opening_id": self._resolve(material_pool["footage_opening"], plan.footage_opening,"开场白视频") or {},
                         "video_regular_ids": [
                             res for mid in plan.footage_regular
@@ -724,8 +774,49 @@ class Recommend:
             )
 
         else:
-            version_per_script = int((self.task.video_count//len(scripts)) + 1)
-            video_director_logger.info(f"🎁 有文案推荐: 每段文案生成{version_per_script}套推荐方案")
+            # Tell if video count is less than the mount of scripts
+            if self.task.video_count<len(scripts):
+                # Create script candidates
+                script_candidates = ""
+                for item in scripts:
+                    if isinstance(item, dict):
+                        script_candidates += f"- 文案ID: {item.get('material_id')} - 文案内容: {item.get('script_content')}\n"
+                try:
+                    selected_results = await self.select_script_chain.ainvoke(
+                        {
+                            'video_count': self.task.video_count,
+                            'city_name': self.task.city_name,
+                            'show_title': self.task.show_title,
+                            'show_desc': self.task.show_desc,
+                            'task_desc': self.task.task_desc,
+                            'ai_director': self.task.ai_director,
+                            'script_candidates': script_candidates,
+                        }
+                    )
+                    # Use selected results to replace scripts
+                    scripts = []
+                    for item in selected_results.results:
+                        scripts.append({
+                            "material_id": item.material_id,
+                            "script_content": item.script_content
+                        })
+                    video_director_logger.info(f"🎁 有文案推荐: 仅使用{len(scripts)}套文案推荐方案")
+                except Exception as e:
+                    video_director_logger.error(f"❌ 选择文案出错: {e}")
+
+                version_per_script = 1
+            else:
+                version_per_script = int(((self.task.video_count-1)//len(scripts)) + 1)
+                video_director_logger.info(f"🎁 有文案推荐: {len(scripts)}段文案，每段生成{version_per_script}套推荐方案")
+
+            video_director_logger.info("推荐的最终选择范围: \n"
+                                       f"  - footage_opening长度: {len(footage_opening)}\n"
+                                       f"  - footage_regular长度: {len(footage_regular)}\n"
+                                       f"  - image长度: {len(image)}\n"
+                                       f"  - bgm长度: {len(bgm)}\n"
+                                       f"  - tts长度: {len(tts)}\n"
+                                       f"  - scripts长度: {len(scripts)}\n"
+                                       )
 
             script_plans_lookup = {}
 
@@ -758,6 +849,7 @@ class Recommend:
                     recommended_plans = []
                     for plan in llm_response.plans:
                         resolved = {
+                            "retry_video": self.retry_video,
                             "video_opening_id": self._resolve(material_pool["footage_opening"], plan.footage_opening,
                                                          "开场白视频") or {},
                             "video_regular_ids": [
@@ -805,37 +897,8 @@ class Recommend:
         """Directly generate"""
         video_director_logger.info("🔹 ▶️ 普通成片推荐方案开始")
         start_time = datetime.now()
-
-        # ------- Search additional materials from vector database -------
-        try:
-            additional_results = await self._additional_search()
-            # {
-            #     "footage_regular":[{"material_id": 1, "material_path": "xx", "material_desc": "xx", "duration": 1.0,"mandatory": False}...],
-            #     "footage_opening":[{"material_id": 1, "material_path": "xx", "material_desc": "xx", "duration": 1.0,"mandatory": False}...],
-            #     "image":[{"material_id": 1, "material_path": "xx", "material_desc": "xx", "duration": 0.0,"mandatory": False}...],
-            #     "bgm":[{"material_id": 1, "material_path": "xx", "material_desc": "xx", "duration": 1.0,"mandatory": False}...],
-            # }
-        except Exception as e:
-            e_m = f"❌ 向量数据库搜索失败: {e}"
-            video_director_logger.error(e_m)
-            additional_results = {
-                "footage_regular": [],
-                "footage_opening": [],
-                "image": [],
-                "bgm": []
-            }
-
-        # ------- Decide additional voices -------
-        try:
-            additional_tts = await self._decide_additional_tts()
-            # [{"material_id": 1, "material_desc": "xx", "mandatory": False}...]
-        except Exception as e:
-            e_m = f"❌ 选择配音音色失败: {e}"
-            video_director_logger.error(e_m)
-            additional_tts = []
-
         # ------- Recommend plans -------
-        if self.task.template_strategy==1: # Prioritize selected
+        if self.task.template_strategy==1: # Prioritize selected, no need to have additional materials
             # ------- Process Footage (Opening & Regular) -------
             footage_opening, footage_regular = [], []
             for item in self.result.get("videos", []):
@@ -862,8 +925,8 @@ class Recommend:
                     "mandatory": True
                 })
 
-            footage_opening = self._merge_with_dedup(footage_opening, additional_results.get("footage_opening", []))
-            footage_regular = self._merge_with_dedup(footage_regular, additional_results.get("footage_regular", []))
+            # footage_opening = self._merge_with_dedup(footage_opening, additional_results.get("footage_opening", []))
+            # footage_regular = self._merge_with_dedup(footage_regular, additional_results.get("footage_regular", []))
 
             # ------- Process Images -------
             image = []
@@ -880,51 +943,113 @@ class Recommend:
                     "duration": 0.0,
                     "mandatory": True
                 })
-            image = self._merge_with_dedup(image, additional_results.get("image", []))
+            # image = self._merge_with_dedup(image, additional_results.get("image", []))
 
             # ------- Process BGM -------
             bgm = []
             for item in self.result.get("bgms", []):
                 m_id = int(item.get('material_id'))
                 m_path = str(item.get('material_path'))
-                desc_json = await self._fetch_desc_from_milvus(m_id, "bgm")
-                if not desc_json:
-                    continue
 
-                bgm.append({
-                    "material_id": m_id,
-                    "material_path": m_path,
-                    "material_desc": str(desc_json.get("overall_summary", "")),
-                    "duration": float(desc_json.get("duration", 0.0)),
-                    "mandatory": True
-                })
+                if m_id != 0:
+                    desc_json = await self._fetch_desc_from_milvus(m_id, "bgm")
+                    if not desc_json:
+                        continue
+
+                    bgm.append({
+                        "material_id": m_id,
+                        "material_path": m_path,
+                        "material_desc": str(desc_json.get("overall_summary", "")),
+                        "duration": float(desc_json.get("duration", 0.0)),
+                        "mandatory": True
+                    })
+
+                else: # Special rule: if BGM material id == 0 (there will be only one item in fact), directly use retrieval results
+                    # ------- Search additional materials from vector database -------
+                    try:
+                        additional_results = await self._additional_search()
+                        # {
+                        #     "footage_regular":[{"material_id": 1, "material_path": "xx", "material_desc": "xx", "duration": 1.0,"mandatory": False}...],
+                        #     "footage_opening":[{"material_id": 1, "material_path": "xx", "material_desc": "xx", "duration": 1.0,"mandatory": False}...],
+                        #     "image":[{"material_id": 1, "material_path": "xx", "material_desc": "xx", "duration": 0.0,"mandatory": False}...],
+                        #     "bgm":[{"material_id": 1, "material_path": "xx", "material_desc": "xx", "duration": 1.0,"mandatory": False}...],
+                        # }
+                    except Exception as e:
+                        e_m = f"❌ 向量数据库搜索失败: {e}"
+                        video_director_logger.error(e_m)
+                        additional_results = {
+                            "footage_regular": [],
+                            "footage_opening": [],
+                            "image": [],
+                            "bgm": []
+                        }
+                    bgm = additional_results.get("bgm", [])
 
             # Special rule: BGM remains empty if no pre-selected items exist
-            # Special rule: if BGM material id == 0, directly use retrieval results
-            bgm = self._merge_with_dedup(bgm, additional_results.get("bgm", [])) if self.result.get("bgms", []) else []
+            # bgm = self._merge_with_dedup(bgm, additional_results.get("bgm", [])) if self.result.get("bgms", []) else []
 
             # ------- Process TTS -------
             tts = []
             for item in self.result.get("voices", []):
                 m_id = int(item.get('material_id'))
-                tts_info = self.tts_data_map.get(m_id)
-                if not tts_info:
-                    continue
-                tts.append({
-                    "material_id": m_id,
-                    "material_desc": tts_info.get("material_desc"), # in tts_data, "material_desc" is already the description string
-                    "mandatory": True
-                })
+                if m_id != 0:
+                    tts_info = self.tts_data_map.get(m_id)
+                    if not tts_info:
+                        continue
+                    tts.append({
+                        "material_id": m_id,
+                        "material_desc": tts_info.get("material_desc"), # in tts_data, "material_desc" is already the description string
+                        "mandatory": True
+                    })
+                else: # Special rule: if tts material id == 0 (there will be only one item in fact), directly use retrieval results
+                    # ------- Decide additional voices -------
+                    try:
+                        additional_tts = await self._decide_additional_tts()
+                        # [{"material_id": 1, "material_desc": "xx", "mandatory": False}...]
+                    except Exception as e:
+                        e_m = f"❌ 选择配音音色失败: {e}"
+                        video_director_logger.error(e_m)
+                        additional_tts = []
+                    tts = additional_tts
             # Add additional search results after processing
-            tts = self._merge_with_dedup(tts, additional_tts)
+            # tts = self._merge_with_dedup(tts, additional_tts)
 
             results = await self._select_best(footage_opening, footage_regular, image, bgm, tts,
                                            scripts = self.result.get("scripts", []))
             duration = (datetime.now() - start_time).total_seconds()
-            video_director_logger.info(f"🔹 ✅ 普通成片推荐方案结束, 优先已选, 耗时{round(duration, 2)}秒")
+            video_director_logger.info(f"🔹 ✅ 普通成片推荐方案结束, 优先已选, 耗时{round(duration, 2)}秒\n"
+                                       f"推荐结果:{results}")
             return results
 
         elif self.task.template_strategy==2:
+            # ------- Search additional materials from vector database -------
+            try:
+                additional_results = await self._additional_search()
+                # {
+                #     "footage_regular":[{"material_id": 1, "material_path": "xx", "material_desc": "xx", "duration": 1.0,"mandatory": False}...],
+                #     "footage_opening":[{"material_id": 1, "material_path": "xx", "material_desc": "xx", "duration": 1.0,"mandatory": False}...],
+                #     "image":[{"material_id": 1, "material_path": "xx", "material_desc": "xx", "duration": 0.0,"mandatory": False}...],
+                #     "bgm":[{"material_id": 1, "material_path": "xx", "material_desc": "xx", "duration": 1.0,"mandatory": False}...],
+                # }
+            except Exception as e:
+                e_m = f"❌ 向量数据库搜索失败: {e}"
+                video_director_logger.error(e_m)
+                additional_results = {
+                    "footage_regular": [],
+                    "footage_opening": [],
+                    "image": [],
+                    "bgm": []
+                }
+
+            # ------- Decide additional voices -------
+            try:
+                additional_tts = await self._decide_additional_tts()
+                # [{"material_id": 1, "material_desc": "xx", "mandatory": False}...]
+            except Exception as e:
+                e_m = f"❌ 选择配音音色失败: {e}"
+                video_director_logger.error(e_m)
+                additional_tts = []
+
             results = await self._select_best(
                 additional_results.get("footage_opening", []),
                 additional_results.get("footage_regular", []),
@@ -934,7 +1059,8 @@ class Recommend:
                 self.result.get("scripts", [])
             )
             duration = (datetime.now() - start_time).total_seconds()
-            video_director_logger.info(f"🔹 ✅ 普通成片推荐方案结束, 智能匹配，耗时{round(duration, 2)}秒")
+            video_director_logger.info(f"🔹 ✅ 普通成片推荐方案结束, 智能匹配，耗时{round(duration, 2)}秒\n"
+                                       f"推荐结果:{results}")
             return results
         else:
             e_m = f"❌ 成片策略输入值有误：只能是1或2，当前输入{self.task.template_strategy}"
@@ -994,7 +1120,8 @@ class Recommend:
 
         results = await self._select_best(footage_opening, footage_regular, image, bgm, tts, scripts)
         duration = (datetime.now() - start_time).total_seconds()
-        video_director_logger.info(f"🔄 ✅ 普通成片重新生成推荐方案结束, 耗时{round(duration, 2)}秒")
+        video_director_logger.info(f"🔄 ✅ 普通成片重新生成推荐方案结束, 耗时{round(duration, 2)}秒\n"
+                                   f"推荐结果:{results}")
         return results
 
     async def _mult_recommend(self) -> RecommendationResult:
@@ -1076,7 +1203,8 @@ class Recommend:
 
         results = await self._select_best(footage_opening, footage_regular, image, bgm, tts, scripts)
         duration = (datetime.now() - start_time).total_seconds()
-        video_director_logger.info(f"⚛️ ✅ 爆款裂变推荐方案结束, 耗时{round(duration, 2)}秒")
+        video_director_logger.info(f"⚛️ ✅ 爆款裂变推荐方案结束, 耗时{round(duration, 2)}秒\n"
+                                   f"推荐结果:{results}")
         return results
 
     async def execute(self)->RecommendationResult:
@@ -1103,16 +1231,15 @@ class Recommend:
 if __name__ == "__main__":
     task1 = TaskRequest(
         task_desc = "生成短视频",  # user's description on task, can be empty
-        task_type = 4,  # 1 普通成片  2 普通成片重新生成  3 爆款裂变   4 爆款裂变重新生成
+        task_type = 1,  # 1 普通成片  2 普通成片重新生成  3 爆款裂变   4 爆款裂变重新生成
         video_type = 1, # 1 口播从开场白视频开始 2 口播在开场白视频结束后开始，视频时长限制要稍微尝一下
         ai_director = "突出人多热闹，商业感强",  # user requirements, can be empty
-        template_strategy = 2,  # 1使用已选中优先 2 智能匹配
+        template_strategy = 1,  # 1使用已选中优先 2 智能匹配
         retry_type = 0,
         video_count = 7,
         city_name =  "北京",
         show_title = "国际汽车文化节",
         show_address = "首钢会展中心",
-        show_time = "2026-05-01到05-03",
         show_desc = None,  # user's description on the show, can be empty
         mult_source = [
             {
@@ -1196,31 +1323,66 @@ if __name__ == "__main__":
     result1 = {
         "videos": [
             {
-                "material_id": 324,
+                "material_id": 126,
+                "material_path": "https://www.pexels.com/zh-cn/download/video/35715727.mp4",
+                "is_opening": 1
+            },
+            {
+                "material_id": 110,
+                "material_path": "https://www.pexels.com/zh-cn/download/video/33749020.mp4",
+                "is_opening": 1
+            },
+            {
+                "material_id": 104,
+                "material_path": "https://www.pexels.com/zh-cn/download/video/33749020.mp4",
+                "is_opening": 1
+            },
+            {
+                "material_id": 126,
                 "material_path": "https://www.pexels.com/zh-cn/download/video/35715727.mp4",
                 "is_opening": 0
             },
             {
-                "material_id": 4,
+                "material_id": 110,
+                "material_path": "https://www.pexels.com/zh-cn/download/video/33749020.mp4",
+                "is_opening": 0
+            },
+            {
+                "material_id": 104,
+                "material_path": "https://www.pexels.com/zh-cn/download/video/33749020.mp4",
+                "is_opening": 0
+            },
+            {
+                "material_id": 106,
+                "material_path": "https://www.pexels.com/zh-cn/download/video/35715727.mp4",
+                "is_opening": 1
+            },
+            {
+                "material_id": 112,
+                "material_path": "https://www.pexels.com/zh-cn/download/video/33749020.mp4",
+                "is_opening": 1
+            },
+            {
+                "material_id": 116,
                 "material_path": "https://www.pexels.com/zh-cn/download/video/33749020.mp4",
                 "is_opening": 1
             }
         ],
         "templates": [
             {
-                "material_id": 145,
+                "material_id": 114,
                 "material_path": "https://xiuxiu-pro.meitudata.com/posters/b5ff9c7bdcd0800d735bb9cf27cf82a6.jpg"
             }
         ],
         "bgms": [
             {
-                "material_id": 400,
+                "material_id": 111,
                 "material_path": "https://freepd.cn/api/music/486f72726f722f4372656570792048616c6c6f772e6d7033.mp3"
             }
         ],
         "voices": [
             {
-                "material_id": 139,
+                "material_id": 1,
                 "robot_show_name": "小美"
             }
         ],
