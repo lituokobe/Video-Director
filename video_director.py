@@ -1,7 +1,5 @@
-import json
 from contextlib import asynccontextmanager
 from datetime import datetime
-from pathlib import Path
 from fastapi import FastAPI, Request
 from pymilvus import AsyncMilvusClient
 from config.path_config import TTS_DATA_PATH, MILVUS_URL

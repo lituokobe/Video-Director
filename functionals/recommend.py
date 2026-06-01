@@ -5,13 +5,13 @@ from typing import Literal
 from langchain_core.prompts import ChatPromptTemplate
 from pymilvus import AsyncMilvusClient
 from config.constant_config import TASK_TYPE_CN, MATERIAL_TYPE, TOP_K_RECOMMENDATION, MATERIAL_CN, \
-    DEFAULT_TOTAL_DURATION, TOP_K_MULT, DEFAULT_QUERY
+    DEFAULT_TOTAL_DURATION, TOP_K_MULT, DEFAULT_QUERY, DEFAULT_BGM_DESC
 from config.path_config import MILVUS_URL, TTS_DATA_PATH
 from config.schema_config import RecommendationRequest, RecommendationResult, TaskRequest, QueryResult, DecideTTSResult, \
     VideoPlansResponseNoScript, VideoPlansResponseScript, SelectScriptResult
 from functionals.logger import video_director_logger
 from functionals.utils import user_id_to_collection_name, embed_query
-from models.llm_models import llm_reasoning
+from models.llm_models import llm_reasoning, llm_regular
 
 ADDITIONAL_QUERY_SYSTEM_PROMPT = """
 # === 你的角色 ===
@@ -108,6 +108,33 @@ SELECT_SCRIPT_SYSTEM_PROMPT = """
 ]
 """
 
+SCRIPT_SUB_SYSTEM_PROMPT = """
+# === 你的角色 ===
+你是资深短视频文案字幕调整师，擅长把已经生成好的短视频文案，调整成适合生成字幕的格式。
+
+# === 你的核心任务 === 
+把以下短视频文案分割成若干段，用 | 隔开，**每段不超过10个字**
+## 分段逻辑：
+- 标点符号（逗号、句号、顿号、感叹号、问号等）必需分段，同时删除原标点符号，只保留文本
+- 标点符号分段后，如果有段落仍然超过十个字，合理地把该段落分成不超过十个字的若干段落，每个段落不少于五个字，**不得破坏单词结构，尽量尊重自然语义**
+
+# === 输出要求 ===
+- **必须输出分好段的字符串**
+- 不要打断活动日期，尽量保证活动日期在一个段落内，该段落可略超过十个字
+- 原文案的文本必需完全保留，除此之外不要有任何其他文字
+- **不得输出其他任何格式**，不得聊天，不得输出 | 以外的任何符号
+
+# === 输出示例 ===
+用户输入：2026北京国际汽车文化节来了，6月12日-15日，就在首钢会展中心，百余款新车齐亮相，车模表演现场抽奖high翻天，快带上你的家人朋友来逛展吧！
+你的输出：2026|北京国际汽车文化节|来了|6月12日-15日|就在首钢会展中心|百余款新车齐亮相|车模表演|现场抽奖high翻天|快带上你的家人|朋友来逛展吧
+----------------------
+用户输入：秋日的温情从一颗板栗开始。2025唐山板栗展将于8月13日至17日在唐山会展中心盛大开启。带上家人一起品尝香甜软糯的正宗唐山板栗，感受舌尖上的幸福滋味。
+你的输出：秋日的温情|从一颗板栗开始|2025唐山板栗展|将于8月13日至17日|在唐山会展中心|盛大开启|带上家人一起|品尝香甜软糯的|正宗唐山板栗|感受舌尖上的幸福滋味
+----------------------
+用户输入：走进历史，感受文明。阳泉文物展将于5月1日至7日，在阳泉国际会展中心盛大开启。珍贵文物齐聚一堂，带您领略中华文化的深厚底蕴与无穷魅力。
+你的输出：走进历史|感受文明|阳泉文物展|将于5月1日至7日|在阳泉国际会展中心|盛大开启|珍贵文物齐聚一堂|带您领略中华文化的|深厚底蕴与无穷魅力
+"""
+
 class Recommend:
     def __init__(self, request: RecommendationRequest, tts_data:list):
         self.task_id: int = request.task_id
@@ -128,6 +155,9 @@ class Recommend:
 
         # select scripts if required video to generate is less than scripts (regular recommend - prioritize selection)
         self.select_script_chain = self._generate_select_script_chain()
+
+        # convert regular script to the version suitable for subtitle
+        self.script_sub_chain = self._generate_script_sub_chain()
 
         self.milvus_client = AsyncMilvusClient(uri=MILVUS_URL, secure=False)
 
@@ -168,6 +198,24 @@ class Recommend:
         select_script_prompt = ChatPromptTemplate.from_messages([("system", SELECT_SCRIPT_SYSTEM_PROMPT)])
         llm_with_structured_output_select_script = llm_reasoning.with_structured_output(SelectScriptResult)
         return select_script_prompt | llm_with_structured_output_select_script
+
+    @staticmethod
+    def _generate_script_sub_chain():
+        script_sub_prompt = ChatPromptTemplate.from_messages(
+            [
+                ("system", SCRIPT_SUB_SYSTEM_PROMPT),
+                ("human", "用户输入：{script_reg}")
+            ]
+        )
+        return script_sub_prompt | llm_regular
+
+    def _generate_script_sub(self, scripts:dict)->str:
+        try:
+            script_reg = scripts["script_content"]
+            script_sub = self.script_sub_chain.invoke({"script_reg": script_reg})
+            return str(script_sub.content)
+        except Exception as e:
+            raise RuntimeError(e)
 
     async def _fetch_desc_from_milvus(self, m_id: int, partition: str) -> dict | None:
         """Safely query Milvus and extract desc_json."""
@@ -825,6 +873,14 @@ class Recommend:
             for i in range(len_scripts):
                 video_director_logger.info(f"开始为第{i+1}/{len_scripts}段文案推荐")
                 script = scripts[i]
+
+                # generate script for subtitles
+                try:
+                    script_sub = self._generate_script_sub(script)
+                except Exception as e:
+                    video_director_logger.error(f"生成字幕剧本有误: {e}")
+                    script_sub = script
+
                 select_best_prompt = self._select_best_prompt_script(footage_opening, footage_regular, image, bgm, tts,
                                                                      script, version_per_script)
                 video_director_logger.info(f"第{i+1}/{len_scripts}段文案推荐提示词:{select_best_prompt}")
@@ -859,7 +915,8 @@ class Recommend:
                             "template_id": self._resolve(material_pool["image"], plan.image, "贴图") or {},
                             "bgm_ids": (self._resolve(material_pool["bgm"], plan.bgm,"背景音乐") or {}) if plan.bgm is not None else None,  # bgm id can be None
                             "voice_ids": self._resolve(material_pool["tts"], plan.tts, "语音音色") or {},
-                            "scripts": script
+                            "scripts": script,
+                            "script_sub": script_sub
                         }
                         recommended_plans.append(resolved)
 
@@ -953,16 +1010,22 @@ class Recommend:
 
                 if m_id != 0:
                     desc_json = await self._fetch_desc_from_milvus(m_id, "bgm")
-                    if not desc_json:
-                        continue
-
-                    bgm.append({
-                        "material_id": m_id,
-                        "material_path": m_path,
-                        "material_desc": str(desc_json.get("overall_summary", "")),
-                        "duration": float(desc_json.get("duration", 0.0)),
-                        "mandatory": True
-                    })
+                    if not desc_json: # sometimes the given bgm is not in vector database, we directly use what is given
+                        bgm.append({
+                            "material_id": m_id,
+                            "material_path": m_path,
+                            "material_desc": DEFAULT_BGM_DESC, # Default bgm description
+                            "duration": 100.0, # Random duration for bgm not in vector database
+                            "mandatory": True
+                        })
+                    else:
+                        bgm.append({
+                            "material_id": m_id,
+                            "material_path": m_path,
+                            "material_desc": str(desc_json.get("overall_summary", "")),
+                            "duration": float(desc_json.get("duration", 0.0)),
+                            "mandatory": True
+                        })
 
                 else: # Special rule: if BGM material id == 0 (there will be only one item in fact), directly use retrieval results
                     # ------- Search additional materials from vector database -------
@@ -1236,7 +1299,7 @@ if __name__ == "__main__":
         ai_director = "突出人多热闹，商业感强",  # user requirements, can be empty
         template_strategy = 1,  # 1使用已选中优先 2 智能匹配
         retry_type = 0,
-        video_count = 7,
+        video_count = 2,
         city_name =  "北京",
         show_title = "国际汽车文化节",
         show_address = "首钢会展中心",
@@ -1411,3 +1474,9 @@ if __name__ == "__main__":
         tts_data=tts_data1
     )
     print(asyncio.run(rcm.execute()))
+    # print(rcm._generate_script_sub(
+    #     {
+    #         "script_content":"2026北京全民购车节，视频要轻松欢快。活动时间是三月14日和15日，地点在北京农业展览馆。这是今年的第一个全民购车节突出今天最后七小时免费抢门票。车展上还有国家，市区县的购车补贴。车展上有进口合资国产新能源各种车型，还有车模表演，带礼品的的游戏。"
+    #     }
+    # )
+    # )
