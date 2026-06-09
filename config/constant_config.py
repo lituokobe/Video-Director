@@ -23,7 +23,12 @@ TASK_TYPE_CN = {
 }
 
 DEFAULT_QUERY = "适合商业会展"
+DEFAULT_FOOTAGE_DESC = "适合商业会展的视频素材"
+DEFAULT_IMAGE_DESC = "适合商业会展的图片素材"
 DEFAULT_BGM_DESC = "适合商业会展的背景音乐"
+DEFAULT_TTS_DESC = "适合商业会展的解说音色"
+DEFAULT_DURATION = 10.0
+
 
 LOG_KEEPING_HOURS = 24
 LOG_PREFIX = "video_director"

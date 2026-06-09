@@ -71,9 +71,9 @@ class TaskRequest(BaseModel):
     task_type: int #1 普通成片  2 普通成片得 重新生成  3 爆款裂变   4 爆款裂变得重新生成
     ai_director: str | None  # user requirements, can be empty
     template_strategy: Literal[1, 2]  # 1使用已选中优先 2 智能匹配
-    city_name: str = Field(min_length=1)  # "北京"
-    show_title: str = Field(min_length=1)  # "国际汽车文化节"
-    show_address: str = Field(min_length=1)  # "北京国际展览中心"
+    city_name: str = Field(default="")  # "北京"
+    show_title: str = Field(default="") # "国际汽车文化节"
+    show_address: str | None  # "北京国际展览中心"
     show_start_date: str = Field(default="")  # "2026-05-01"
     show_end_date: str = Field(default="") # "2026-05-03"
     retry_type: Literal[0, 1, 2]

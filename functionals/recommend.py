@@ -5,7 +5,8 @@ from typing import Literal
 from langchain_core.prompts import ChatPromptTemplate
 from pymilvus import AsyncMilvusClient
 from config.constant_config import TASK_TYPE_CN, MATERIAL_TYPE, TOP_K_RECOMMENDATION, MATERIAL_CN, \
-    DEFAULT_TOTAL_DURATION, TOP_K_MULT, DEFAULT_QUERY, DEFAULT_BGM_DESC
+    DEFAULT_TOTAL_DURATION, TOP_K_MULT, DEFAULT_QUERY, DEFAULT_BGM_DESC, DEFAULT_FOOTAGE_DESC, DEFAULT_DURATION, \
+    DEFAULT_IMAGE_DESC, DEFAULT_TTS_DESC
 from config.path_config import MILVUS_URL, TTS_DATA_PATH
 from config.schema_config import RecommendationRequest, RecommendationResult, TaskRequest, QueryResult, DecideTTSResult, \
     VideoPlansResponseNoScript, VideoPlansResponseScript, SelectScriptResult
@@ -25,7 +26,7 @@ ADDITIONAL_QUERY_SYSTEM_PROMPT = """
 # === 输出要求 ===
 - **必须输出仅含一个键的JSON**：
     - `query`: 生成的查询语句，不超过100字
-- **不得输出其他格式**，或其他JSON键值，不得输出自然语言对话
+- **不得输出其他格式，或其他JSON键值，不得输出自然语言对话，不得输出换行符或其他任何无意义的符号**
 
 # === 重要指示 ===
 - 查询语句必须包括并完整体现展会行业和用户要求，**不得减少或更改**
@@ -34,17 +35,13 @@ ADDITIONAL_QUERY_SYSTEM_PROMPT = """
 # === 输出示例 ===
 用户输入: "【展会名称】：北京国际车展\n【展会活动描述】：2026北京国际车展，今年全国最大的车展，有很多新的车型和科技都将亮相\n【视频任务描述】：30秒的短视频\n【用户具体需求】：突出热闹、科技感"
 你的输出:
-{{
-  "query": "汽车、人群、科技、氛围热烈、充满科技感。适合大型车展、新车发布会、新汽车科技发布会的短视频制作"
-}}
+{{"query": "汽车、人群、科技、氛围热烈、充满科技感。适合大型车展、新车发布会、新汽车科技发布会的短视频制作"}}
 
 ----------------------
 
 用户输入: "【展会名称】：沧州福居家博会\n【展会活动描述】：很多大牌家装品牌参展，目标定位有装修需求的家庭\n【视频任务描述】：\n【用户具体需求】：希望能吸引家庭客户"
 你的输出:
-{{
-  "query": "家具品牌、卫浴品牌、电器品牌、人群、热闹、全家参观。适合家装博览会、家电展销会、家具销售会会的短视频制作"
-}}
+{{"query": "家具品牌、卫浴品牌、电器品牌、人群、热闹、全家参观。适合家装博览会、家电展销会、家具销售会会的短视频制作"}}
 """
 
 DECIDE_ADDITIONAL_TTS_SYSTEM_PROMPT = """
@@ -59,20 +56,14 @@ DECIDE_ADDITIONAL_TTS_SYSTEM_PROMPT = """
 - **必须输出仅含两个键的JSON**：
     - `material_ids`: 长度为{top_k}的整数列表，对应所选音色的ID
     - `material_descs`: 长度为{top_k}的字符串列表，必须与下方音色描述**逐字完全一致**，顺序与material_ids一一对应
-- **不得输出其他格式**，或其他JSON键值，不得输出自然语言对话
+- **不得输出其他格式，或其他JSON键值，不得输出自然语言对话，不得输出换行符或其他任何无意义的符号**
 - 严禁捏造、修改、拼接或使用音色库之外的ID与描述
 
 # === 可选音色 ===
 {formatted_tts_data}
 
-# === 输出示例 (仅参考格式) ===
-{{
-  "material_ids": [138, 139, 149, ......],
-  "material_descs":["语调平稳、咬字柔和、自带治愈安抚力的女声音色",
-                    "声线甜美有活力的妹妹，活泼开朗，笑容明媚。", 
-                    "声线阳光温暖、语气亲切，活力满满的少年音",
-                    ......]
-}}
+# === 输出示例， **仅参考格式** ===
+{{"material_ids": [138, 139, 149], "material_descs":["语调平稳、咬字柔和、自带治愈安抚力的女声音色", "声线甜美有活力的妹妹，活泼开朗，笑容明媚。", "声线阳光温暖、语气亲切，活力满满的少年音"]}}
 """
 
 SELECT_SCRIPT_SYSTEM_PROMPT = """
@@ -92,20 +83,10 @@ SELECT_SCRIPT_SYSTEM_PROMPT = """
 - 每个文案字典必须包含且只能包含两个字段：
     - `material_id`: 1个整数，文案ID
     - `script_content`: 字符串，仅一字不差的文案内容
-- **不得输出其他格式**，或其他JSON键值，不得输出自然语言对话
+- **不得输出其他格式，或其他JSON键值，不得输出自然语言对话，不得输出换行符或其他任何无意义的符号**
 
-# === 输出示例 (仅参考格式) ===
-[
-    {{
-      "material_id": 1,
-      "script_content": "2026北京国际汽车文化节来了，6月12日-15日，就在首钢会展中心，百余款新车齐亮相，车模表演现场抽奖high翻天，快带上你的家人朋友来逛展吧！"
-    }},
-    {{
-      "material_id": 3,
-      "script_content": "2026北京国际汽车文化节将在6月12日-15日登录首钢会展中心，大牌新车云集，车模表演现场抽奖氛围热烈，热爱汽车的你千万不要错过！"
-    }},
-    .........
-]
+# === 输出示例， **仅参考格式** ===
+[{{"material_id": 1, "script_content": "2026北京国际汽车文化节来了，6月12日-15日，就在首钢会展中心，百余款新车齐亮相，车模表演现场抽奖high翻天，快带上你的家人朋友来逛展吧！"}}, {{"material_id": 3, "script_content": "2026北京国际汽车文化节将在6月12日-15日登录首钢会展中心，大牌新车云集，车模表演现场抽奖氛围热烈，热爱汽车的你千万不要错过！"}}]
 """
 
 SCRIPT_SUB_SYSTEM_PROMPT = """
@@ -294,7 +275,7 @@ class Recommend:
                         "material_id":int(m.get("material_id")),
                         "material_path": str(m.get("material_path")),
                         "material_desc": str(m.get("desc_json").get("overall_summary", "")),
-                        "duration":float(m.get("desc_json").get("duration", 0.0)),
+                        "duration":float(m.get("desc_json").get("duration", DEFAULT_DURATION)),
                         "mandatory":False
                     }
                     for m in result[0]
@@ -388,7 +369,7 @@ class Recommend:
     def _resolve(pool: dict, m_id: int, field: str) -> dict | None:
         mat = pool.get(m_id)
         if mat:
-            m_path = mat.get("material_path")
+            m_path = mat.get("material_path") if isinstance(mat, dict) else ""
             return {
                 "material_id": m_id,
                 "material_path": m_path
@@ -424,7 +405,7 @@ class Recommend:
                         "material_id": m_id,
                         "material_path": m_path,
                         "material_desc": str(desc_json.get("overall_summary", "")),
-                        "duration": float(desc_json.get("duration", 0.0)),
+                        "duration": float(desc_json.get("duration", DEFAULT_DURATION)),
                         "mandatory": False  # retry material only for reference
                     })
 
@@ -453,7 +434,7 @@ class Recommend:
                         "material_id": m_id,
                         "material_path": m_path,
                         "material_desc": str(desc_json.get("overall_summary", "")),
-                        "duration": float(desc_json.get("duration", 0.0)),
+                        "duration": float(desc_json.get("duration", DEFAULT_DURATION)),
                         "mandatory": False
                     })
 
@@ -463,7 +444,7 @@ class Recommend:
                 if tts_info:
                     retry_tts.append({
                         "material_id": r_v_m_id,
-                        "material_desc": tts_info.get("material_desc"),
+                        "material_desc": tts_info.get("material_desc") if isinstance(tts_info, dict) else DEFAULT_TTS_DESC,
                         # in tts_data, "material_desc" is already the description string
                         "mandatory": False
                     })
@@ -512,7 +493,7 @@ class Recommend:
                                     "material_id": int(m.get("material_id")),
                                     "material_path": str(m.get("material_path")),
                                     "material_desc": str(m.get("desc_json").get("overall_summary", "")),
-                                    "duration": float(m.get("desc_json").get("duration", 0.0)),
+                                    "duration": float(m.get("desc_json").get("duration", DEFAULT_DURATION)),
                                     "mandatory": False
                                 }
                             )
@@ -530,7 +511,7 @@ class Recommend:
                                     "material_id": int(m.get("material_id")),
                                     "material_path": str(m.get("material_path")),
                                     "material_desc": str(m.get("desc_json").get("overall_summary", "")),
-                                    "duration": float(m.get("desc_json").get("duration", 0.0)),
+                                    "duration": float(m.get("desc_json").get("duration", DEFAULT_DURATION)),
                                     "mandatory": False
                                 }
                             )
@@ -551,7 +532,7 @@ class Recommend:
                                     "material_id": int(m.get("material_id")),
                                     "material_path": str(m.get("material_path")),
                                     "material_desc": str(m.get("desc_json").get("overall_summary", "")),
-                                    "duration": float(m.get("desc_json").get("duration", 0.0)),
+                                    "duration": float(m.get("desc_json").get("duration", DEFAULT_DURATION)),
                                     "mandatory": False
                                 }
                             )
@@ -597,7 +578,7 @@ class Recommend:
             return ""
         lines = []
         for item in items:
-            dur_part = f"时长{item.get('duration', 0.0)}秒, " if include_duration else ""
+            dur_part = f"时长{item.get('duration', DEFAULT_DURATION)}秒, " if include_duration else ""
             mand_part = "必需" if item.get("mandatory") else "非必需"
             desc_part = item.get("material_desc", "").replace("\n",
                                                               "\n    ")  # add some indention for line changing
@@ -650,26 +631,10 @@ class Recommend:
     - `footage_regular`: 包含整数的数组，1个或多个普通视频素材的material_id
     - `image`: 1个整数，文字贴图的的material_id
     - `bgm`: 1个整数或null，背景音乐的的material_id
-- **不得输出其他格式**，或其他JSON键值，不得输出自然语言对话
+- **不得输出其他格式，或其他JSON键值，不得输出自然语言对话，不得输出换行符或其他任何无意义的符号**
 
-# === 输出示例 (仅参考格式) ===
-{{
-  "plans": [
-    {{
-      "footage_opening": 4,
-      "footage_regular": [326],
-      "image": 145,
-      "bgm": 400
-    }},
-    {{
-      "footage_opening": 15,
-      "footage_regular": [327, 323],
-      "image": 17,
-      "bgm": 5
-    }},
-    .........
-  ]
-}}
+# === 输出示例， **仅参考格式** ===
+{{"plans": [{{"footage_opening": 4, "footage_regular": [326], "image": 145,"bgm": 400}}, {{"footage_opening": 15, "footage_regular": [327, 323], "image": 17, "bgm": 5}}]}}
 """
 
     def _select_best_prompt_script(self, footage_opening: list, footage_regular: list,
@@ -725,28 +690,10 @@ class Recommend:
     - `image`: 1个整数，文字贴图的material_id
     - `bgm`: 1个整数或null，背景音乐的的material_id
     - `tts`: 1个整数，语音音色的material_id
-- **不得输出其他格式**，或其他JSON键值，不得输出自然语言对话
+- **不得输出其他格式，或其他JSON键值，不得输出自然语言对话，不得输出换行符或其他任何无意义的符号**
 
-# === 输出示例 (仅参考格式) ===
-{{
-  "plans": [
-    {{
-      "footage_opening": 4,
-      "footage_regular": [328],
-      "image": 145,
-      "bgm": 400,
-      "tts": 141
-    }},
-    {{
-      "footage_opening": 15,
-      "footage_regular": [327, 323],
-      "image": 5,
-      "bgm": 6,
-      "tts": 142
-    }},
-    .........
-  ]
-}}
+# === 输出示例， **仅参考格式** ===
+{{"plans": [{{"footage_opening": 4, "footage_regular": [328], "image": 145, "bgm": 400, "tts": 141}}, {{"footage_opening": 15, "footage_regular": [327, 323], "image": 5, "bgm": 6, "tts": 142}}]}}
 """
 
     async def _select_best(self, footage_opening: list, footage_regular: list,
@@ -952,8 +899,9 @@ class Recommend:
 
     async def _regular_recommend(self)-> RecommendationResult:
         """Directly generate"""
-        video_director_logger.info("🔹 ▶️ 普通成片推荐方案开始")
         start_time = datetime.now()
+        video_director_logger.info("🔹 ▶️ 普通成片推荐方案开始")
+        video_director_logger.info(f"用户指定模板(result): {self.result}")
         # ------- Recommend plans -------
         if self.task.template_strategy==1: # Prioritize selected, no need to have additional materials
             # ------- Process Footage (Opening & Regular) -------
@@ -971,16 +919,22 @@ class Recommend:
 
                 # Get the retrieved desc
                 desc_json = await self._fetch_desc_from_milvus(m_id, partition)
-                if not desc_json:
-                    continue
-
-                target.append({
-                    "material_id": m_id,
-                    "material_path": m_path,
-                    "material_desc": str(desc_json.get("overall_summary", "")),
-                    "duration":float(desc_json.get("duration", 0.0)),
-                    "mandatory": True
-                })
+                if not desc_json: # Sometimes the footage is not in Milvus yet, we use the default desc
+                    target.append({
+                        "material_id": m_id,
+                        "material_path": m_path,
+                        "material_desc": DEFAULT_FOOTAGE_DESC,
+                        "duration": DEFAULT_DURATION,
+                        "mandatory": True
+                    })
+                else:
+                    target.append({
+                        "material_id": m_id,
+                        "material_path": m_path,
+                        "material_desc": str(desc_json.get("overall_summary", "")),
+                        "duration":float(desc_json.get("duration", DEFAULT_DURATION)),
+                        "mandatory": True
+                    })
 
             # footage_opening = self._merge_with_dedup(footage_opening, additional_results.get("footage_opening", []))
             # footage_regular = self._merge_with_dedup(footage_regular, additional_results.get("footage_regular", []))
@@ -991,19 +945,27 @@ class Recommend:
                 m_id = int(item.get('material_id'))
                 m_path = str(item.get('material_path'))
                 desc_json = await self._fetch_desc_from_milvus(m_id, "image")
-                if not desc_json:
-                    continue
-                image.append({
-                    "material_id": m_id,
-                    "material_path": m_path,
-                    "material_desc": str(desc_json.get("overall_summary", "")),
-                    "duration": 0.0,
-                    "mandatory": True
-                })
+                if not desc_json:  # Sometimes the image is not in Milvus yet, we use the default desc
+                    image.append({
+                        "material_id": m_id,
+                        "material_path": m_path,
+                        "material_desc": DEFAULT_IMAGE_DESC,
+                        "duration": 0.0,
+                        "mandatory": True
+                    })
+                else:
+                    image.append({
+                        "material_id": m_id,
+                        "material_path": m_path,
+                        "material_desc": str(desc_json.get("overall_summary", "")),
+                        "duration": 0.0,
+                        "mandatory": True
+                    })
             # image = self._merge_with_dedup(image, additional_results.get("image", []))
 
             # ------- Process BGM -------
             bgm = []
+            bgm_need_search = False
             for item in self.result.get("bgms", []):
                 m_id = int(item.get('material_id'))
                 m_path = str(item.get('material_path'))
@@ -1015,7 +977,7 @@ class Recommend:
                             "material_id": m_id,
                             "material_path": m_path,
                             "material_desc": DEFAULT_BGM_DESC, # Default bgm description
-                            "duration": 100.0, # Random duration for bgm not in vector database
+                            "duration": DEFAULT_DURATION,
                             "mandatory": True
                         })
                     else:
@@ -1023,29 +985,42 @@ class Recommend:
                             "material_id": m_id,
                             "material_path": m_path,
                             "material_desc": str(desc_json.get("overall_summary", "")),
-                            "duration": float(desc_json.get("duration", 0.0)),
+                            "duration": float(desc_json.get("duration", DEFAULT_DURATION)),
                             "mandatory": True
                         })
 
                 else: # Special rule: if BGM material id == 0 (there will be only one item in fact), directly use retrieval results
-                    # ------- Search additional materials from vector database -------
-                    try:
-                        additional_results = await self._additional_search()
-                        # {
-                        #     "footage_regular":[{"material_id": 1, "material_path": "xx", "material_desc": "xx", "duration": 1.0,"mandatory": False}...],
-                        #     "footage_opening":[{"material_id": 1, "material_path": "xx", "material_desc": "xx", "duration": 1.0,"mandatory": False}...],
-                        #     "image":[{"material_id": 1, "material_path": "xx", "material_desc": "xx", "duration": 0.0,"mandatory": False}...],
-                        #     "bgm":[{"material_id": 1, "material_path": "xx", "material_desc": "xx", "duration": 1.0,"mandatory": False}...],
-                        # }
-                    except Exception as e:
-                        e_m = f"❌ 向量数据库搜索失败: {e}"
-                        video_director_logger.error(e_m)
-                        additional_results = {
-                            "footage_regular": [],
-                            "footage_opening": [],
-                            "image": [],
-                            "bgm": []
-                        }
+                    bgm_need_search = True
+
+            # ------- Search additional materials from vector database -------
+            if (not footage_regular) or (not footage_opening) or (not image) or bgm_need_search:
+                # We must gurantee that there are content in footage_regular, footage_opening and image.
+                # Also when there are id=0 in bgm, we need to guarantee bgm as well.
+                video_director_logger.info("🔹 🔎 普通成片-选择优先，搜索向量数据库")
+                try:
+                    additional_results = await self._additional_search()
+                    # {
+                    #     "footage_regular":[{"material_id": 1, "material_path": "xx", "material_desc": "xx", "duration": 1.0,"mandatory": False}...],
+                    #     "footage_opening":[{"material_id": 1, "material_path": "xx", "material_desc": "xx", "duration": 1.0,"mandatory": False}...],
+                    #     "image":[{"material_id": 1, "material_path": "xx", "material_desc": "xx", "duration": 0.0,"mandatory": False}...],
+                    #     "bgm":[{"material_id": 1, "material_path": "xx", "material_desc": "xx", "duration": 1.0,"mandatory": False}...],
+                    # }
+                except Exception as e:
+                    e_m = f"❌ 向量数据库搜索失败: {e}"
+                    video_director_logger.error(e_m)
+                    additional_results = {
+                        "footage_regular": [],
+                        "footage_opening": [],
+                        "image": [],
+                        "bgm": []
+                    }
+                if not footage_regular:
+                    footage_regular = additional_results.get("footage_regular", [])
+                if not footage_opening:
+                    footage_opening = additional_results.get("footage_opening", [])
+                if not image:
+                    image = additional_results.get("image", [])
+                if bgm_need_search:
                     bgm = additional_results.get("bgm", [])
 
             # Special rule: BGM remains empty if no pre-selected items exist
@@ -1058,12 +1033,18 @@ class Recommend:
                 if m_id != 0:
                     tts_info = self.tts_data_map.get(m_id)
                     if not tts_info:
-                        continue
-                    tts.append({
-                        "material_id": m_id,
-                        "material_desc": tts_info.get("material_desc"), # in tts_data, "material_desc" is already the description string
-                        "mandatory": True
-                    })
+                        tts.append({
+                            "material_id": m_id,
+                            "material_desc": DEFAULT_TTS_DESC,
+                            "mandatory": True
+                        })
+                    else:
+                        tts.append({
+                            "material_id": m_id,
+                            "material_desc": tts_info.get("material_desc", DEFAULT_TTS_DESC) if isinstance(tts_info, dict) else DEFAULT_TTS_DESC,
+                            # in tts_data, "material_desc" is already the description string
+                            "mandatory": True
+                        })
                 else: # Special rule: if tts material id == 0 (there will be only one item in fact), directly use retrieval results
                     # ------- Decide additional voices -------
                     try:
@@ -1086,6 +1067,7 @@ class Recommend:
 
         elif self.task.template_strategy==2:
             # ------- Search additional materials from vector database -------
+            video_director_logger.info("🔹 🔎 普通成片-智能匹配，搜索向量数据库")
             try:
                 additional_results = await self._additional_search()
                 # {
@@ -1145,6 +1127,7 @@ class Recommend:
          retry_tts, retry_scripts) = await self._gather_retry_data(retry_source)
 
         # ------- Search additional materials from vector database -------
+        video_director_logger.info("🔄 🔎 普通成片重新生成搜索向量数据库")
         try:
             additional_results = await self._additional_search()
             # {
@@ -1211,6 +1194,7 @@ class Recommend:
          mult_tts, mult_scripts) = await self._gather_mult_data(mult_source)
 
         # ------- Search additional materials from vector database -------
+        video_director_logger.info("⚛️ 🔎 爆款裂变搜索向量数据库")
         try:
             additional_results = await self._additional_search()
             # {
