@@ -200,27 +200,35 @@ class Recommend:
 
     async def _fetch_desc_from_milvus(self, m_id: int, partition: str) -> dict | None:
         """Safely query Milvus and extract desc_json."""
-        res = await self.milvus_client.query(
-            collection_name=self.collection_name,
-            partition_names=[partition],
-            filter=f"material_id == {m_id} and status == 1",
-            output_fields=["desc_json"]
-        )
-        if not res:
+        try:
+            res = await self.milvus_client.query(
+                collection_name=self.collection_name,
+                partition_names=[partition],
+                filter=f"material_id == {m_id} and status == 1",
+                output_fields=["desc_json"]
+            )
+            if not res:
+                return None
+            return res[0].get("desc_json")
+        except Exception as e:
+            video_director_logger.error(f"{e}")
             return None
-        return res[0].get("desc_json")
 
     async def _fetch_vector_from_milvus(self, m_id: int, partition: str) -> list | None:
         """Safely query Milvus and extract vector."""
-        res = await self.milvus_client.query(
-            collection_name=self.collection_name,
-            partition_names=[partition],
-            filter=f"material_id == {m_id} and status == 1",
-            output_fields=["vector"]
-        )
-        if not res:
+        try:
+            res = await self.milvus_client.query(
+                collection_name=self.collection_name,
+                partition_names=[partition],
+                filter=f"material_id == {m_id} and status == 1",
+                output_fields=["vector"]
+            )
+            if not res:
+                return None
+            return res[0].get("vector")
+        except Exception as e:
+            video_director_logger.error(f"{e}")
             return None
-        return res[0].get("vector")
 
     async def _additional_search(self)->dict:
         video_director_logger.info("搜索向量数据库开始")
@@ -628,9 +636,9 @@ class Recommend:
 - `plans` 的值是包含{self.task.video_count}个字典的列表，每个字典代表一个版本 (如果提供的视频、贴图、音乐等素材不够生成足够多的不同版本，则能生成多少就生成多少)。
 - 每个版本字典必须包含且只能包含以下字段：
     - `footage_opening`: 1个整数，开场白视频素材的material_id
-    - `footage_regular`: 包含整数的数组，1个或多个普通视频素材的material_id
-    - `image`: 1个整数，文字贴图的的material_id
-    - `bgm`: 1个整数或null，背景音乐的的material_id
+    - `footage_regular`: 包含整数的数组，整数为1个或多个普通视频素材的material_id
+    - `image`: 1个整数，文字贴图的material_id
+    - `bgm`: 1个整数或null，背景音乐的material_id，无可用素材时可为空
 - **不得输出其他格式，或其他JSON键值，不得输出自然语言对话，不得输出换行符或其他任何无意义的符号**
 
 # === 输出示例， **仅参考格式** ===
@@ -686,9 +694,9 @@ class Recommend:
 - `plans` 的值是包含 {version_per_script} 个字典的列表，每个字典代表一个版本 (如果提供的视频、贴图、音乐、语音音色等素材不够生成足够多的不同版本，则能生成多少就生成多少)。
 - 每个版本字典必须包含且只能包含以下字段：
     - `footage_opening`: 1个整数，开场白视频素材的material_id
-    - `footage_regular`: 包含整数的数组，1个或多个普通视频素材的material_id
+    - `footage_regular`: 包含整数的数组，整数为1个或多个普通视频素材的material_id
     - `image`: 1个整数，文字贴图的material_id
-    - `bgm`: 1个整数或null，背景音乐的的material_id
+    - `bgm`: 1个整数或null，背景音乐的material_id，无可用素材时可为空
     - `tts`: 1个整数，语音音色的material_id
 - **不得输出其他格式，或其他JSON键值，不得输出自然语言对话，不得输出换行符或其他任何无意义的符号**
 
